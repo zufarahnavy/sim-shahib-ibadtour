@@ -195,7 +195,8 @@
         kategori: document.getElementById("kKategori").value,
         sub_kategori: document.getElementById("kSubKategori").value,
         sumber: state.editingKontenSource,
-        link_onedrive: document.getElementById("kLinkOnedrive").value
+        link_embed: document.getElementById("kLinkEmbed").value,
+        link_unduh: document.getElementById("kLinkUnduh").value
       };
       try {
         await callApi("tambahKonten", payload);
@@ -476,11 +477,28 @@
   // =====================================================================
   const AdminTampilan = {
     pending: {},
+    current: {},
     async load() {
       try {
         const res = await callApi("getPengaturan");
         const d = res.data || {};
+        this.current = d;
+
+        // Banner
+        document.getElementById("bnMusim").value = (d.banner && d.banner.musim) || "";
+        document.getElementById("bnJudul").value = (d.banner && d.banner.judul) || "";
+        document.getElementById("bnSubjudul").value = (d.banner && d.banner.subjudul) || "";
+        this.showImgOrEmpty("prevBannerImg", "prevBannerImgEmpty", d.banner && d.banner.gambar);
+
+        // About
         document.getElementById("tpStory").value = (d.about && d.about.story) || "";
+        this.showImgOrEmpty("prevAboutImg", "prevAboutImgEmpty", d.about && d.about.gambar);
+        this.renderPilarEditor((d.about && d.about.pilar) || []);
+
+        // Legalitas
+        this.renderLegalitasEditor(d.legalitas || []);
+
+        // Kontak
         const c = d.kontak || {};
         document.getElementById("tpAlamat").value = c.alamat || "";
         document.getElementById("tpTelp").value = c.telp || "";
@@ -488,17 +506,51 @@
         document.getElementById("tpWa").value = c.wa || "";
       } catch (e) { toast(e.message, "error"); }
     },
+
+    showImgOrEmpty(imgId, emptyId, url) {
+      const img = document.getElementById(imgId);
+      const empty = document.getElementById(emptyId);
+      if (url) { img.src = url; img.style.display = "block"; if (empty) empty.style.display = "none"; }
+      else { img.style.display = "none"; if (empty) empty.style.display = "block"; }
+    },
+
+    renderPilarEditor(pilar) {
+      const list = pilar.length ? pilar : [{}, {}, {}, {}];
+      document.getElementById("pilarEditor").innerHTML = list.map((p, i) => `
+        <div class="card card-pad" style="background:var(--bg);">
+          <div style="display:flex;gap:8px;">
+            <input class="input" style="max-width:56px;text-align:center;" data-pilar="${i}" data-f="ikon" value="${p.ikon || ""}" placeholder="✓"/>
+            <input class="input" data-pilar="${i}" data-f="judul" value="${(p.judul || "").replace(/"/g, "&quot;")}" placeholder="Judul pilar"/>
+          </div>
+          <textarea class="input" style="margin-top:8px;" rows="2" data-pilar="${i}" data-f="deskripsi" placeholder="Deskripsi singkat">${p.deskripsi || ""}</textarea>
+        </div>`).join("");
+    },
+
+    renderLegalitasEditor(items) {
+      const list = items.length ? items : [{}, {}, {}, {}];
+      document.getElementById("legalitasEditor").innerHTML = list.map((l, i) => `
+        <div class="card card-pad" style="background:var(--bg);">
+          <input class="input" data-legal="${i}" data-f="label" value="${(l.label || "").replace(/"/g, "&quot;")}" placeholder="Label (mis. PPIU)"/>
+          <input class="input" style="margin-top:8px;" data-legal="${i}" data-f="nilai" value="${(l.nilai || "").replace(/"/g, "&quot;")}" placeholder="Nilai (mis. No. U.419 Th. 2021)"/>
+        </div>`).join("");
+    },
+
     preview(input, imgId) {
       const file = input.files[0];
       if (!file) return;
       if (file.size > 2 * 1024 * 1024) { toast("Ukuran file melebihi 2MB.", "error"); input.value = ""; return; }
       const reader = new FileReader();
       reader.onload = (e) => {
-        document.getElementById(imgId).src = e.target.result;
+        const img = document.getElementById(imgId);
+        img.src = e.target.result;
+        img.style.display = "block";
+        const emptyEl = document.getElementById(imgId + "Empty");
+        if (emptyEl) emptyEl.style.display = "none";
         this.pending[imgId] = { name: file.name, base64: e.target.result.split(",")[1], mime: file.type };
       };
       reader.readAsDataURL(file);
     },
+
     async saveLogo() {
       try {
         await callApi("simpanLogo", { files: this.pending });
@@ -511,16 +563,82 @@
       try { await callApi("revertLogoDefault"); toast("Logo dikembalikan ke bawaan.", "success"); location.reload(); }
       catch (e) { toast(e.message, "error"); }
     },
-    async saveTeks() {
+
+    async flushPendingImages() {
+      // Kirim gambar banner/about yang baru dipilih (jika ada) sebelum menyimpan teks,
+      // supaya gambar & teks tersimpan dalam satu alur yang sama bagi admin.
+      const imgKeys = ["prevBannerImg", "prevAboutImg"].filter((k) => this.pending[k]);
+      if (!imgKeys.length) return;
+      const payload = {};
+      imgKeys.forEach((k) => (payload[k] = this.pending[k]));
+      await callApi("simpanLogo", { files: payload });
+      imgKeys.forEach((k) => delete this.pending[k]);
+    },
+
+    async saveBanner() {
+      try {
+        await this.flushPendingImages();
+        await callApi("simpanPengaturanTeks", {
+          banner: {
+            musim: document.getElementById("bnMusim").value,
+            judul: document.getElementById("bnJudul").value,
+            subjudul: document.getElementById("bnSubjudul").value
+          }
+        });
+        toast("Banner musim disimpan & diterapkan.", "success");
+      } catch (e) { toast(e.message, "error"); }
+    },
+
+    collectPilar() {
+      const inputs = document.querySelectorAll("[data-pilar]");
+      const map = {};
+      inputs.forEach((el) => {
+        const i = el.dataset.pilar;
+        map[i] = map[i] || {};
+        map[i][el.dataset.f] = el.value;
+      });
+      return Object.keys(map).sort().map((i) => map[i]);
+    },
+
+    async saveAbout() {
+      try {
+        await this.flushPendingImages();
+        await callApi("simpanPengaturanTeks", {
+          about: { story: document.getElementById("tpStory").value, pilar: this.collectPilar() }
+        });
+        toast("Section Tentang Kami disimpan & diterapkan.", "success");
+      } catch (e) { toast(e.message, "error"); }
+    },
+
+    collectLegalitas() {
+      const inputs = document.querySelectorAll("[data-legal]");
+      const map = {};
+      inputs.forEach((el) => {
+        const i = el.dataset.legal;
+        map[i] = map[i] || {};
+        map[i][el.dataset.f] = el.value;
+      });
+      return Object.keys(map).sort().map((i) => map[i]);
+    },
+
+    async saveLegalitas() {
+      try {
+        await callApi("simpanPengaturanTeks", { legalitas: this.collectLegalitas() });
+        toast("Legalitas disimpan & diterapkan.", "success");
+      } catch (e) { toast(e.message, "error"); }
+    },
+
+    async saveKontak() {
       try {
         await callApi("simpanPengaturanTeks", {
-          story: document.getElementById("tpStory").value,
-          alamat: document.getElementById("tpAlamat").value,
-          telp: document.getElementById("tpTelp").value,
-          email: document.getElementById("tpEmail").value,
-          wa: document.getElementById("tpWa").value
+          kontak: {
+            alamat: document.getElementById("tpAlamat").value,
+            telp: document.getElementById("tpTelp").value,
+            email: document.getElementById("tpEmail").value,
+            wa: document.getElementById("tpWa").value
+          }
         });
-        toast("Teks tampilan disimpan.", "success");
+        toast("Kontak disimpan & diterapkan.", "success");
       } catch (e) { toast(e.message, "error"); }
     }
   };

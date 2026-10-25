@@ -73,7 +73,8 @@
 
 <!-- ======================= BANNER MUSIM (gambar di atas) ======================= -->
 <section class="season-banner hidden" id="seasonBanner">
-  <div class="season-banner-art" aria-hidden="true">
+  <img id="seasonBannerPhoto" class="season-banner-photo hidden" alt="" />
+  <div class="season-banner-art" id="seasonBannerArt" aria-hidden="true">
     <svg viewBox="0 0 1600 480" preserveAspectRatio="xMidYMax slice" xmlns="http://www.w3.org/2000/svg">
       <defs>
         <linearGradient id="skyGrad" x1="0" y1="0" x2="0" y2="1">
@@ -121,9 +122,9 @@
   </div>
   <div class="season-banner-rays" aria-hidden="true"></div>
   <div class="container season-banner-inner">
-    <span class="badge-pill season-badge"><span class="badge-pulse"></span> Musim Umrah &amp; Haji 1446–1447 H</span>
+    <span class="badge-pill season-badge"><span class="badge-pulse"></span> <span id="seasonBadgeText">Musim Umrah &amp; Haji 1446–1447 H</span></span>
     <h2 class="t-headline-lg season-title" id="seasonTitle">Materi Syiar Terbaru, Siap Disebarkan</h2>
-    <p class="lead season-lead">Satu portal untuk seluruh Mitra &amp; Agen — dokumen, video, dan flyer resmi musim ini, diperbarui setiap pekan.</p>
+    <p class="lead season-lead" id="seasonLead">Satu portal untuk seluruh Mitra &amp; Agen — dokumen, video, dan flyer resmi musim ini, diperbarui setiap pekan.</p>
     <button class="btn btn-primary btn-ripple" onclick="App.goto('katalog')">Lihat Materi Musim Ini</button>
   </div>
   <div class="season-banner-scroll-cue" aria-hidden="true"><span></span></div>
@@ -187,28 +188,19 @@
     <div class="container">
       <div class="section-head"><span class="kicker">Cerita &amp; Nilai</span><h2 class="t-headline-lg">Tentang SHAHIB Ibad Tour</h2></div>
       <div style="display:grid;grid-template-columns:1fr 1.2fr;gap:36px;align-items:center;" id="aboutGridWrap">
-        <div class="arch-photo reveal" data-reveal="left">
-          <img src="assets/kaaba.jpg" alt="Ka'bah" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentElement.style.background='linear-gradient(160deg,#3a3a38,#1c1c1b)'"/>
+        <div class="arch-photo reveal" data-reveal="left" id="aboutPhotoWrap">
+          <img id="aboutImg" src="" alt="SHAHIB Ibad Tour" style="width:100%;height:100%;object-fit:cover;" />
+          <div class="arch-photo-pattern" aria-hidden="true"></div>
         </div>
         <div class="reveal" data-reveal="right">
           <p class="t-body" id="aboutStory">Lebih dari 13 tahun, kami hadir membimbing jamaah dengan penuh keikhlasan dan kekeluargaan — memastikan setiap langkah ibadah terasa khidmat, nyaman, dan penuh cinta.</p>
-          <div class="pillar-grid reveal-group" style="margin-top:20px;">
-            <div class="pillar"><div class="ic">✓</div><div><b>Amanah &amp; Transparan</b><p class="t-body" style="margin:4px 0 0;font-size:13px;">Setiap proses jelas &amp; dapat dipertanggungjawabkan.</p></div></div>
-            <div class="pillar"><div class="ic">📅</div><div><b>Pasti Jadwalnya</b><p class="t-body" style="margin:4px 0 0;font-size:13px;">Keberangkatan terjadwal tanpa penundaan.</p></div></div>
-            <div class="pillar"><div class="ic">🕊</div><div><b>Nyaman Ibadahnya</b><p class="t-body" style="margin:4px 0 0;font-size:13px;">Fasilitas &amp; bimbingan yang menenangkan.</p></div></div>
-            <div class="pillar"><div class="ic">❤</div><div><b>Penuh Cinta Keluarga</b><p class="t-body" style="margin:4px 0 0;font-size:13px;">Melayani jamaah seperti keluarga sendiri.</p></div></div>
-          </div>
+          <div class="pillar-grid reveal-group" id="pillarGrid" style="margin-top:20px;"></div>
         </div>
       </div>
 
-      <div style="margin-top:48px;">
+      <div style="margin-top:56px;">
         <span class="kicker">Legalitas</span><h3 class="t-headline" style="margin:4px 0 16px;">Legalitas Kemenag</h3>
-        <div class="legal-grid reveal-group">
-          <div class="card card-pad"><b class="t-title">PPIU</b><p class="t-body" style="font-size:13px;">No. U.419 Th. 2021</p></div>
-          <div class="card card-pad"><b class="t-title">PIHK</b><p class="t-body" style="font-size:13px;">Akreditasi "A"</p></div>
-          <div class="card card-pad"><b class="t-title">Badan Hukum</b><p class="t-body" style="font-size:13px;">PT Resmi Terdaftar</p></div>
-          <div class="card card-pad"><b class="t-title">Asosiasi</b><p class="t-body" style="font-size:13px;">AMPHURI / HIMPUH</p></div>
-        </div>
+        <div class="legal-grid reveal-group" id="legalGrid"></div>
       </div>
     </div>
   </section>

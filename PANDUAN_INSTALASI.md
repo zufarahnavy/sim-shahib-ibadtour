@@ -191,6 +191,32 @@ Sebelum itu dikonfigurasi, gunakan **Password Darurat** untuk mengelola aplikasi
 
 ---
 
+## BAGIAN 6 — Update Backend Setelah Revisi (Pengaturan.gs & Konten.gs berubah)
+
+Karena ada penambahan fitur "Pengaturan Tampilan lengkap" (banner, about, legalitas) dan pemisahan Link Embed/Link Unduh OneDrive, **dua file backend berubah**: `Pengaturan.gs` dan `Konten.gs`.
+
+1. Buka project Apps Script Anda → buka file `Pengaturan.gs` di editor → **hapus semua isinya** → tempel isi file `Pengaturan.gs` yang baru dikirimkan → Save.
+2. Lakukan hal yang sama untuk `Konten.gs`.
+3. **Deploy → Manage deployments → Edit (ikon pensil) → New version → Deploy** agar perubahan backend ini terbit (URL Web App tetap sama, tidak perlu ganti `GAS_URL` di frontend).
+
+## BAGIAN 7 — Cara Pakai Pengaturan Tampilan (Admin)
+
+Di Panel Admin → **Pengaturan Tampilan**, sekarang tersedia kontrol penuh untuk:
+- **Banner Musim** — unggah gambar banner + ubah label musim/judul/subjudul. Jika gambar tidak diunggah, tampil ilustrasi siluet masjid bawaan.
+- **Section Tentang Kami** — unggah foto + ubah cerita singkat + ubah 4 kartu nilai/pilar (ikon emoji, judul, deskripsi).
+- **Legalitas Kemenag** — ubah label & nilai dari 4 kartu legalitas.
+- **Kontak** — alamat, telepon, email, WhatsApp (seperti sebelumnya).
+
+Setiap bagian punya tombol **Simpan** sendiri — perubahan langsung tampil di landing page begitu disimpan (cache otomatis diperbarui).
+
+## BAGIAN 8 — Link OneDrive: Embed vs Unduh Langsung
+
+Di form **Kelola Konten**, saat memilih sumber "Link OneDrive", sekarang ada 2 kolom:
+- **Link Embed** — untuk pratinjau di dalam aplikasi. Ambil dari OneDrive: klik kanan file → **Share** → **Embed** → salin URL di dalam `src="..."`.
+- **Link Unduh Langsung** — untuk tombol Unduh. Ambil dari OneDrive: **Share** → **Copy Link** (akses "Anyone with the link"). Sistem otomatis menambahkan parameter `download=1` supaya file langsung terunduh, tidak membuka halaman pratinjau OneDrive dulu (inilah penyebab proses "download lama" sebelumnya).
+
+Isi minimal salah satu kolom; isi keduanya untuk hasil terbaik.
+
 ## Troubleshooting
 
 | Masalah | Solusi |

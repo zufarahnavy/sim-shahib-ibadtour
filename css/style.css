@@ -406,3 +406,33 @@ canvas#heroCanvas{position:absolute;inset:0;z-index:1;opacity:.55;pointer-events
   .season-title{font-size:24px;}
   .season-banner-scroll-cue{display:none;}
 }
+
+.season-banner-photo{position:absolute;inset:0;z-index:0;width:100%;height:100%;object-fit:cover;
+  transition:opacity .5s ease, transform .35s cubic-bezier(.22,.8,.3,1); will-change:transform;}
+.season-banner-art{transition:opacity .5s ease, transform .35s cubic-bezier(.22,.8,.3,1); will-change:transform;}
+
+/* ---------- About photo: textured placeholder so it never looks empty ---------- */
+.arch-photo{position:relative;}
+.arch-photo img{opacity:0;transition:opacity .4s ease;}
+.arch-photo img[src]:not([src=""]){opacity:1;}
+.arch-photo-pattern{position:absolute;inset:0;background:
+    radial-gradient(circle at 30% 20%, rgba(203,171,42,0.14), transparent 55%),
+    radial-gradient(circle at 75% 75%, rgba(203,171,42,0.10), transparent 50%),
+    repeating-linear-gradient(135deg, rgba(246,239,201,0.05) 0 2px, transparent 2px 26px),
+    linear-gradient(160deg,#3a3a38,#1c1c1b);}
+.arch-photo.has-photo .arch-photo-pattern{opacity:0;transition:opacity .4s ease;}
+
+/* ---------- Section rhythm: more generous, "expensive" breathing room ---------- */
+section{padding:84px 0;}
+.section-head{margin-bottom:36px;}
+@media (max-width:640px){ section{padding:56px 0;} }
+
+/* ---------- Decorative wave seam between banner and the rest of the page ---------- */
+.section-seam{position:relative;height:0;}
+.section-seam svg{position:absolute;bottom:-1px;left:0;width:100%;height:46px;display:block;}
+
+/* ---------- Floating bob for the season badge pill ---------- */
+@media (prefers-reduced-motion: no-preference){
+  .season-badge{animation:badgeBob 3.6s ease-in-out infinite;}
+  @keyframes badgeBob{0%,100%{transform:translateY(0);}50%{transform:translateY(-4px);}}
+}

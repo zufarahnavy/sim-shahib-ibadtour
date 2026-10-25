@@ -185,6 +185,7 @@
       this.bindNav();
       this.initHeroCanvas();
       this.initStars();
+      this.initBannerParallax();
       this.initRipple();
       this.initScrollReveal();
       this.animateCounters();
@@ -242,6 +243,30 @@
           if (p < 1) requestAnimationFrame(tick);
         }
         requestAnimationFrame(tick);
+      });
+    },
+
+    // ---------------- Motion: subtle parallax on the season banner art ----------------
+    initBannerParallax() {
+      const banner = document.getElementById("seasonBanner");
+      const art = document.getElementById("seasonBannerArt");
+      const photo = document.getElementById("seasonBannerPhoto");
+      if (!banner || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      let raf = null;
+      banner.addEventListener("mousemove", (e) => {
+        const rect = banner.getBoundingClientRect();
+        const px = (e.clientX - rect.left) / rect.width - 0.5;
+        const py = (e.clientY - rect.top) / rect.height - 0.5;
+        if (raf) cancelAnimationFrame(raf);
+        raf = requestAnimationFrame(() => {
+          const tx = px * 14, ty = py * 10;
+          art.style.transform = `translate(${tx}px, ${ty}px) scale(1.04)`;
+          if (photo) photo.style.transform = `translate(${tx * 0.6}px, ${ty * 0.6}px) scale(1.06)`;
+        });
+      });
+      banner.addEventListener("mouseleave", () => {
+        art.style.transform = "translate(0,0) scale(1)";
+        if (photo) photo.style.transform = "translate(0,0) scale(1)";
       });
     },
 
@@ -345,6 +370,44 @@
         document.getElementById("entryLogo").src = state.pengaturan.logo_gelap;
         document.getElementById("headerLogo").src = state.pengaturan.logo_terang || state.pengaturan.logo_gelap;
       }
+
+      this.renderBanner(state.pengaturan.banner || {});
+      this.renderAbout(state.pengaturan.about || {});
+      this.renderLegalitas(state.pengaturan.legalitas || []);
+    },
+
+    renderBanner(b) {
+      if (b.musim) document.getElementById("seasonBadgeText").textContent = b.musim;
+      if (b.judul) document.getElementById("seasonTitle").textContent = b.judul;
+      if (b.subjudul) document.getElementById("seasonLead").textContent = b.subjudul;
+      const photo = document.getElementById("seasonBannerPhoto");
+      const art = document.getElementById("seasonBannerArt");
+      if (b.gambar) {
+        photo.src = b.gambar;
+        photo.classList.remove("hidden");
+        art.style.opacity = "0.18"; // ilustrasi tetap terlihat tipis sebagai tekstur di belakang foto asli
+      }
+    },
+
+    renderAbout(a) {
+      if (a.story) document.getElementById("aboutStory").textContent = a.story;
+      const img = document.getElementById("aboutImg");
+      const wrap = document.getElementById("aboutPhotoWrap");
+      if (a.gambar) { img.src = a.gambar; wrap.classList.add("has-photo"); }
+      else { wrap.classList.remove("has-photo"); }
+
+      const pilar = (a.pilar && a.pilar.length) ? a.pilar : [];
+      document.getElementById("pillarGrid").innerHTML = pilar.map((p) => `
+        <div class="pillar">
+          <div class="ic">${p.ikon || "✓"}</div>
+          <div><b>${escapeHtml(p.judul || "")}</b><p class="t-body" style="margin:4px 0 0;font-size:13px;">${escapeHtml(p.deskripsi || "")}</p></div>
+        </div>`).join("");
+    },
+
+    renderLegalitas(items) {
+      document.getElementById("legalGrid").innerHTML = (items || []).map((l) => `
+        <div class="card card-pad"><b class="t-title">${escapeHtml(l.label || "")}</b><p class="t-body" style="font-size:13px;">${escapeHtml(l.nilai || "")}</p></div>
+      `).join("");
     },
 
     setCategory(cat) {
