@@ -1,108 +1,106 @@
-/* ============================================================
-   API client — fetch ke Google Apps Script (REST API murni)
-   Kontrak mengikuti backend/Kode.gs:
-     POST  {action, token, data}  →  {success, data, message, code, ms, v, tokenBaru?}
-   - POST memakai text/plain (menghindari CORS preflight GAS)
-   - Dua token terpisah: sesi Mitra/Guest (localStorage, 12 jam) dan admin (sessionStorage, 60 mnt idle)
-   - Dedupe baca in-flight + epoch tulis, penggabung batch admin (gas-scale-turbo 4.2/4.3)
-   - Tidak pernah melempar galat: selalu mengembalikan {success:false, code, message}
-   ============================================================ */
-(function () {
-  'use strict';
-  const CFG = window.APP_CONFIG || {};
-  const BELUM = !CFG.GAS_URL || /GANTI|XXXX/.test(CFG.GAS_URL);
-  const ADMIN_RE = /^(batch$|konten\.(admin|simpan|hapus|massal|cekLink)|upload\.|sub\.|mitra\.(admin|simpan|status|impor)|laporan\.|pesan\.|pengaturan\.|logo\.|rahasia\.|darurat\.|sesi\.|admin\.|sistem\.|migrasi\.)/;
-  const BACA = /^(boot|pub\.init|pub\.config|mitra\.list|auth\.config|konten\.admin\.list|sub\.list|mitra\.admin\.list|laporan\.ringkasan|pengaturan\.get|pesan\.list|sistem\.status|rahasia\.status|admin\.list)$/;
-  const BATCHABLE = /^(konten\.admin\.list|sub\.list|mitra\.admin\.list|laporan\.ringkasan|pengaturan\.get|pesan\.list|sistem\.status|rahasia\.status|admin\.list)$/;
-  const inflight = {}; let epoch = 0;
-  const perf = [];
+/* ==========================================================================
+   SIM SHAHIB IbadTour — API Helper (gas-pro-api pattern)
+   Semua komunikasi ke backend GAS via fetch() + JSON.
+   PENTING: POST menggunakan Content-Type: text/plain;charset=utf-8
+   agar tidak memicu CORS preflight (GAS doPost tidak bisa membalas
+   preflight OPTIONS dengan header CORS).
+   ========================================================================== */
+(function (global) {
+  const CFG = global.SIM_CONFIG;
+  let sessionToken = localStorage.getItem("sim_session_token") || null;
 
-  function store(kind) { try { return window[kind]; } catch (e) { return null; } }
-  function mk(kind, key) {
-    return {
-      get: function () { try { return store(kind).getItem(key) || ''; } catch (e) { return ''; } },
-      set: function (v) { try { v ? store(kind).setItem(key, v) : store(kind).removeItem(key); } catch (e) { } }
+  // --- request de-duplication: cegah fetch dobel utk payload identik yg masih berjalan
+  const inFlight = new Map();
+
+  function buildKey(action, payload) {
+    return action + "::" + JSON.stringify(payload || {});
+  }
+
+  async function callApi(action, payload = {}, { useCache = false } = {}) {
+    const key = buildKey(action, payload);
+
+    if (inFlight.has(key)) return inFlight.get(key);
+
+    const isGet = ["getKatalog", "getMitraList", "getPengaturan", "pingWarmup"].includes(action);
+
+    const execute = async () => {
+      try {
+        let res;
+        if (isGet) {
+          const qs = new URLSearchParams({ action, ...flatten(payload) });
+          res = await fetch(`${CFG.GAS_URL}?${qs.toString()}`, { method: "GET" });
+        } else {
+          const body = JSON.stringify({
+            action,
+            token: sessionToken,
+            data: payload
+          });
+          res = await fetch(CFG.GAS_URL, {
+            method: "POST",
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body
+          });
+        }
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const json = await res.json();
+        if (json && json.ok === false) {
+          throw new ApiError(json.message || "Terjadi kesalahan", json.code);
+        }
+        return json;
+      } finally {
+        inFlight.delete(key);
+      }
     };
-  }
-  const Tok = { user: mk('localStorage', 'shahib.tok'), admin: mk('sessionStorage', 'shahib.adm') };
 
-  function net(body, timeout) {
-    const ac = new AbortController(), t = setTimeout(function () { ac.abort(); }, timeout || 30000);
-    return fetch(CFG.GAS_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body), signal: ac.signal, redirect: 'follow' })
-      .then(function (r) { clearTimeout(t); return r.json(); })
-      .catch(function (e) {
-        clearTimeout(t);
-        return { success: false, code: 'NET', message: e && e.name === 'AbortError' ? 'Server terlalu lama merespons. Periksa koneksi lalu coba lagi.' : 'Tidak bisa terhubung ke server. Periksa koneksi internet.' };
-      });
+    const promise = execute();
+    inFlight.set(key, promise);
+    return promise;
   }
 
-  async function run(action, data, retry) {
-    if (BELUM) return { success: false, code: 'CONFIG', message: 'URL backend belum diisi di js/config.js.' };
-    const admin = ADMIN_RE.test(action), t0 = performance.now();
-    const token = admin ? Tok.admin.get() : Tok.user.get();
-    let res = await net({ action: action, token: token, data: data || {} });
-    if (res.code === 'NET' && retry) res = await net({ action: action, token: token, data: data || {} });
-    if (res.tokenBaru) { (admin ? Tok.admin : Tok.user).set(res.tokenBaru); }
-    if (res.code === 'AUTH') {
-      (admin ? Tok.admin : Tok.user).set('');
-      window.dispatchEvent(new CustomEvent('shahib:auth', { detail: { realm: admin ? 'admin' : 'user' } }));
+  function flatten(obj) {
+    const out = {};
+    Object.keys(obj || {}).forEach((k) => {
+      const v = obj[k];
+      out[k] = typeof v === "object" ? JSON.stringify(v) : v;
+    });
+    return out;
+  }
+
+  class ApiError extends Error {
+    constructor(message, code) {
+      super(message);
+      this.code = code;
     }
-    perf.push({ aksi: action, total: Math.round(performance.now() - t0), server: res.ms, cache: !!res.cached });
-    if (perf.length > 100) perf.shift();
-    return res;
   }
 
-  function call(action, data) {
-    if (!BACA.test(action) && action !== 'batch') { epoch++; return run(action, data, false); }
-    const k = epoch + '|' + action + '|' + JSON.stringify(data || {});
-    if (inflight[k]) return inflight[k];
-    const p = run(action, data, true); inflight[k] = p;
-    const done = function () { delete inflight[k]; };
-    p.then(done, done);
-    return p;
+  function setSessionToken(token) {
+    sessionToken = token;
+    if (token) localStorage.setItem("sim_session_token", token);
+    else localStorage.removeItem("sim_session_token");
   }
 
-  // Penggabung batch: bacaan admin yang dipanggil pada tik yang sama → 1 eksekusi server
-  const Batcher = {
-    q: null,
-    add: function (action, data) {
-      const self = this;
-      return new Promise(function (resolve) {
-        if (!self.q) { self.q = []; setTimeout(function () { self.flush(); }, 0); }
-        self.q.push({ action: action, data: data || {}, resolve: resolve });
-      });
-    },
-    flush: function () {
-      const q = this.q; this.q = null; if (!q || !q.length) return;
-      if (q.length === 1) { call(q[0].action, q[0].data).then(q[0].resolve); return; }
-      const uniq = [], map = {};
-      q.forEach(function (c) { const k = c.action + JSON.stringify(c.data); if (map[k] === undefined) { map[k] = uniq.length; uniq.push({ action: c.action, data: c.data }); } c.i = map[k]; });
-      call('batch', { calls: uniq.slice(0, 10) }).then(function (r) {
-        if (!r || !r.success) { q.forEach(function (c) { c.resolve(r || { success: false, message: 'Gagal memuat.' }); }); return; }
-        q.forEach(function (c) { c.resolve(r.data.results[c.i] || { success: false, message: 'Tidak ada hasil.' }); });
-      });
-    }
-  };
-  function q(action, data) { return BATCHABLE.test(action) ? Batcher.add(action, data) : call(action, data); }
+  function getSessionToken() {
+    return sessionToken;
+  }
 
-  // Pemanasan server (tidak mengembalikan data) — maks. 1× / 4 menit per sesi tab
-  function warm(scope) {
-    if (BELUM) return;
+  // ---- Simple stale-while-revalidate localStorage cache (client-side) ----
+  function cacheGet(key) {
     try {
-      const k = 'shahib.warm.' + scope, last = Number(sessionStorage.getItem(k) || 0);
-      if (Date.now() - last < 240000) return;
-      sessionStorage.setItem(k, String(Date.now()));
-    } catch (e) { }
-    try { fetch(CFG.GAS_URL + '?w=' + encodeURIComponent(scope), { mode: 'no-cors' }).catch(function () { }); } catch (e) { }
+      const raw = localStorage.getItem("simcache_" + key);
+      if (!raw) return null;
+      const { t, v } = JSON.parse(raw);
+      return { value: v, fresh: Date.now() - t < CFG.CLIENT_CACHE_TTL };
+    } catch (e) {
+      return null;
+    }
+  }
+  function cacheSet(key, value) {
+    try {
+      localStorage.setItem("simcache_" + key, JSON.stringify({ t: Date.now(), v: value }));
+    } catch (e) {
+      /* storage full/unavailable — ignore, not critical */
+    }
   }
 
-  window.API = { call: call, q: q, tok: Tok, warm: warm, belum: BELUM, url: CFG.GAS_URL };
-  window.Perf = {
-    table: function () { console.table(perf); },
-    summary: function () {
-      const g = {}; perf.forEach(function (p) { (g[p.aksi] = g[p.aksi] || []).push(p.total); });
-      const o = {}; Object.keys(g).forEach(function (k) { o[k] = Math.round(g[k].reduce(function (a, b) { return a + b; }, 0) / g[k].length) + ' ms (' + g[k].length + '×)'; });
-      console.table(o);
-    }
-  };
-})();
+  global.SIM_API = { callApi, ApiError, setSessionToken, getSessionToken, cacheGet, cacheSet };
+})(window);
