@@ -177,15 +177,90 @@
       document.getElementById("heroSection").classList.remove("hidden");
       document.getElementById("mainApp").classList.remove("hidden");
       document.getElementById("siteFooter").classList.remove("hidden");
+      document.getElementById("seasonBanner").classList.remove("hidden");
       document.getElementById("footerYear").textContent = new Date().getFullYear();
 
       this.renderUserChip();
       this.renderHero();
       this.bindNav();
       this.initHeroCanvas();
+      this.initStars();
+      this.initRipple();
+      this.initScrollReveal();
+      this.animateCounters();
 
       await Promise.all([this.loadKatalog(), this.loadPengaturan()]);
       this.renderCatalog();
+    },
+
+    // ---------------- Motion: button ripple feedback ----------------
+    initRipple() {
+      document.addEventListener("click", (e) => {
+        const btn = e.target.closest(".btn-ripple");
+        if (!btn) return;
+        const rect = btn.getBoundingClientRect();
+        const size = Math.max(rect.width, rect.height);
+        const span = document.createElement("span");
+        span.className = "ripple";
+        span.style.width = span.style.height = size + "px";
+        span.style.left = (e.clientX - rect.left - size / 2) + "px";
+        span.style.top = (e.clientY - rect.top - size / 2) + "px";
+        btn.appendChild(span);
+        setTimeout(() => span.remove(), 650);
+      });
+    },
+
+    // ---------------- Motion: scroll-triggered reveal (once) ----------------
+    initScrollReveal() {
+      const targets = document.querySelectorAll(".reveal, .reveal-group");
+      if (!targets.length || !("IntersectionObserver" in window)) {
+        targets.forEach((t) => t.classList.add("in-view"));
+        return;
+      }
+      const io = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("in-view");
+            io.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.18, rootMargin: "0px 0px -40px 0px" });
+      targets.forEach((t) => io.observe(t));
+    },
+
+    // ---------------- Motion: animated counters for hero stats ----------------
+    animateCounters() {
+      document.querySelectorAll("[data-count]").forEach((el) => {
+        const target = Number(el.dataset.count) || 0;
+        const suffix = el.dataset.suffix || "";
+        const dur = 1100;
+        const start = performance.now();
+        function tick(now) {
+          const p = Math.min(1, (now - start) / dur);
+          const eased = 1 - Math.pow(1 - p, 3);
+          el.textContent = Math.round(target * eased) + suffix;
+          if (p < 1) requestAnimationFrame(tick);
+        }
+        requestAnimationFrame(tick);
+      });
+    },
+
+    // ---------------- Decorative: scatter stars on season banner SVG ----------------
+    initStars() {
+      const layer = document.getElementById("starsLayer");
+      if (!layer) return;
+      let svg = "";
+      for (let i = 0; i < 46; i++) {
+        const x = Math.random() * 1600;
+        const y = Math.random() * 230;
+        const r = Math.random() * 1.3 + 0.4;
+        const dur = (Math.random() * 3 + 2.5).toFixed(2);
+        const delay = (Math.random() * 3).toFixed(2);
+        svg += `<circle cx="${x.toFixed(0)}" cy="${y.toFixed(0)}" r="${r.toFixed(2)}" fill="#F6EFC9">
+          <animate attributeName="opacity" values="0.15;1;0.15" dur="${dur}s" begin="${delay}s" repeatCount="indefinite"/>
+        </circle>`;
+      }
+      layer.innerHTML = svg;
     },
 
     renderUserChip() {
@@ -241,7 +316,9 @@
         state.konten = res.data.konten || [];
         state.subKategori = res.data.subKategori || [];
         cacheSet("katalog", { konten: state.konten, subKategori: state.subKategori });
-        document.getElementById("statFileAktif").querySelector("b").textContent = state.konten.length;
+        const statEl = document.getElementById("statFileAktifNum");
+        statEl.dataset.count = state.konten.length;
+        this.animateCounters.call(this); // re-run so the newly-known total also counts up
       } catch (e) {
         toast("Gagal memuat katalog materi. Menampilkan data tersimpan.", "error");
       }
@@ -345,8 +422,8 @@
       const icons = { Dokumen: "📄", Video: "🎬", Gambar: "🖼" };
       const isNew = (d) => (Date.now() - new Date(d).getTime()) < 7 * 24 * 3600 * 1000;
 
-      grid.innerHTML = visible.map((k) => `
-        <div class="card content-card" onclick="App.openPreview('${k.id_konten}')">
+      grid.innerHTML = visible.map((k, i) => `
+        <div class="card content-card card-enter" style="animation-delay:${Math.min(i, 11) * 45}ms" onclick="App.openPreview('${k.id_konten}')">
           <div class="content-thumb">
             <span class="kind-badge">${k.kategori}</span>
             ${isNew(k.tgl_upload) ? '<span class="badge-new" style="position:absolute;top:10px;right:10px;">Baru</span>' : ""}
